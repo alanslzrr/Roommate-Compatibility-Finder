@@ -1,92 +1,88 @@
-
 # 1. SETUP
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import OneHotEncoder
 
-# 2. CARGA DE DATOS
-df = pd.read_csv('dataset_inquilinos.csv', index_col = 'id_inquilino')
-
+# 2. DATA LOADING
+df = pd.read_csv('tenants_dataset.csv', index_col='tenant_id')
 df.columns = [
-'horario', 'bioritmo', 'nivel_educativo', 'leer', 'animacion', 
-'cine', 'mascotas', 'cocinar', 'deporte', 'dieta', 'fumador',
-'visitas', 'orden', 'musica_tipo', 'musica_alta', 'plan_perfecto', 'instrumento'
+    'schedule', 'biorhythm', 'education_level', 'reading', 'animation', 
+    'cinema', 'pets', 'cooking', 'sports', 'diet', 'smoker',
+    'visits', 'tidiness', 'music_type', 'loud_music', 'perfect_plan', 'instrument'
 ]
 
 # 3. ONE HOT ENCODING
-# Realizar el one-hot encoding
+# Perform one-hot encoding
 encoder = OneHotEncoder()
 df_encoded = encoder.fit_transform(df)
-df_encoded_dense = df_encoded.toarray()  # Convertir a array denso
+df_encoded_dense = df_encoded.toarray()  # Convert to dense array
 
-# Obtener los nombres de las variables codificadas después de realizar el one-hot encoding
+# Get the names of encoded variables after performing one-hot encoding
 encoded_feature_names = encoder.get_feature_names_out()
 
-# 4. MATRIZ DE SIMILARIDAD
-# Calcular la matriz de similaridad utilizando el punto producto, asegurándose de usar los datos densos
-matriz_s = np.dot(df_encoded_dense, df_encoded_dense.T)  # Usar datos densos para el cálculo
+# 4. SIMILARITY MATRIX
+# Calculate the similarity matrix using dot product, ensuring to use dense data
+similarity_matrix = np.dot(df_encoded_dense, df_encoded_dense.T)  # Use dense data for calculation
 
-# Define el rango de destino
-rango_min = -100
-rango_max = 100
+# Define the target range
+range_min = -100
+range_max = 100
 
-# Encontrar el mínimo y máximo valor en matriz_s
-min_original = np.min(matriz_s)
-max_original = np.max(matriz_s)
+# Find the minimum and maximum values in similarity_matrix
+min_original = np.min(similarity_matrix)
+max_original = np.max(similarity_matrix)
 
-# Reescalar la matriz
-matriz_s_reescalada = ((matriz_s - min_original) / (max_original - min_original)) * (rango_max - rango_min) + rango_min
+# Rescale the matrix
+rescaled_similarity_matrix = ((similarity_matrix - min_original) / (max_original - min_original)) * (range_max - range_min) + range_min
 
-# Pasar a Pandas
-df_similaridad = pd.DataFrame(matriz_s_reescalada,
-                              index=df.index,
-                              columns=df.index)
+# Convert to Pandas
+df_similarity = pd.DataFrame(rescaled_similarity_matrix,
+                             index=df.index,
+                             columns=df.index)
 
-# 5. BÚSQUEDA DE INQUILINOS COMPATIBLES
+# 5. SEARCH FOR COMPATIBLE TENANTS
 '''
 Input:
-* id_inquilinos: el o los inquilinos actuales DEBE SER UNA LISTA aunque sea solo un dato
-* topn: el número de inquilinos compatibles a buscar
-
+* tenant_ids: the current tenant(s) MUST BE A LIST even if it's just one data point
+* topn: the number of compatible tenants to search for
 Output:
-Lista con 2 elementos.
-Elemento 0: las características de los inquilinos compatibles
-Elemento 1: el dato de similaridad
+List with 2 elements.
+Element 0: the characteristics of compatible tenants
+Element 1: the similarity data
 '''
-
-def inquilinos_compatibles(id_inquilinos, topn):
-    # Verificar si todos los ID de inquilinos existen en la matriz de similaridad
-    for id_inquilino in id_inquilinos:
-        if id_inquilino not in df_similaridad.index:
-            return 'Al menos uno de los inquilinos no encontrado'
-
-    # Obtener las filas correspondientes a los inquilinos dados
-    filas_inquilinos = df_similaridad.loc[id_inquilinos]
-
-    # Calcular la similitud promedio entre los inquilinos
-    similitud_promedio = filas_inquilinos.mean(axis=0)
-
-    # Ordenar los inquilinos en función de su similitud promedio
-    inquilinos_similares = similitud_promedio.sort_values(ascending=False)
-
-    # Excluir los inquilinos de referencia (los que están en la lista)
-    inquilinos_similares = inquilinos_similares.drop(id_inquilinos)
-
-    # Tomar los topn inquilinos más similares
-    topn_inquilinos = inquilinos_similares.head(topn)
-
-    # Obtener los registros de los inquilinos similares
-    registros_similares = df.loc[topn_inquilinos.index]
-
-    # Obtener los registros de los inquilinos buscados
-    registros_buscados = df.loc[id_inquilinos]
-
-    # Concatenar los registros buscados con los registros similares en las columnas
-    resultado = pd.concat([registros_buscados.T, registros_similares.T], axis=1)
-
-    # Crear un objeto Series con la similitud de los inquilinos similares encontrados
-    similitud_series = pd.Series(data=topn_inquilinos.values, index=topn_inquilinos.index, name='Similitud')
-
-    # Devolver el resultado y el objeto Series
-    return(resultado, similitud_series)
+def find_compatible_tenants(tenant_ids, topn):
+    # Check if all tenant IDs exist in the similarity matrix
+    for tenant_id in tenant_ids:
+        if tenant_id not in df_similarity.index:
+            return 'At least one of the tenants not found'
+    
+    # Get the rows corresponding to the given tenants
+    tenant_rows = df_similarity.loc[tenant_ids]
+    
+    # Calculate the average similarity between tenants
+    average_similarity = tenant_rows.mean(axis=0)
+    
+    # Sort tenants based on their average similarity
+    similar_tenants = average_similarity.sort_values(ascending=False)
+    
+    # Exclude reference tenants (those in the list)
+    similar_tenants = similar_tenants.drop(tenant_ids)
+    
+    # Take the topn most similar tenants
+    topn_tenants = similar_tenants.head(topn)
+    
+    # Get the records of similar tenants
+    similar_records = df.loc[topn_tenants.index]
+    
+    # Get the records of searched tenants
+    searched_records = df.loc[tenant_ids]
+    
+    # Concatenate searched records with similar records in columns
+    result = pd.concat([searched_records.T, similar_records.T], axis=1)
+    
+    # Create a Series object with the similarity of found similar tenants
+    similarity_series = pd.Series(data=topn_tenants.values, index=topn_tenants.index, name='Similarity')
+    
+    # Return the result and the Series object
+    return (result, similarity_series)
 
